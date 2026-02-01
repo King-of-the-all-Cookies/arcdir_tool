@@ -1,0 +1,305 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{tikz}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{needspace} 
+
+\geometry{margin=2.5cm}
+
+\usepackage{listingsutf8}
+\lstset{
+  inputencoding=utf8,
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single
+}
+
+\title{Формат ARC/DIR и утилита \texttt{arcdir\_tool}\\Полная техническая документация}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Введение}
+
+Настоящий документ представляет систематизированное техническое описание парного архивного формата \texttt{.arc}/\texttt{.dir} 
+и утилиты \texttt{arcdir\_tool}, предназначенной для извлечения, упаковки и управления архивными данными. 
+Описаны синтаксис командной строки, алгоритмы обработки данных, структура бинарных файлов, правила выравнивания и практические примеры применения.  
+
+Утилита реализована на языке C, обеспечивая:  
+\needspace{3\baselineskip}
+\begin{itemize}
+  \item Высокую производительность благодаря прямому доступу к файлам;
+  \item Кроссплатформенную совместимость (Windows и POSIX-системы);
+  \item Детерминированное поведение при одинаковых входных данных.
+\end{itemize}
+
+\section{Общая концепция}
+
+Формат архива состоит из двух взаимосвязанных файлов:  
+\needspace{3\baselineskip}
+\begin{itemize}
+  \item \texttt{.arc} --- последовательная конкатенация сырых данных файлов;
+  \item \texttt{.dir} --- индекс с метаданными, включающими смещения, размеры и пути файлов.
+\end{itemize}
+
+Файл \texttt{.dir} функционирует как структурированный индекс для \texttt{.arc}. Каждая запись сопоставляет путь к файлу с его смещением и размером в ARC-файле.
+
+\section{Архитектура системы}
+
+\begin{table}[H]
+\centering
+\begin{tikzpicture}[node distance=2.5cm, auto]
+  \node[draw, rectangle] (user) {Юзер};
+  \node[draw, rectangle, right of=user] (tool) {arcdir\_tool};
+  \node[draw, rectangle, right of=tool, yshift=1cm] (arc) {файл .arc};
+  \node[draw, rectangle, right of=tool, yshift=-1cm] (dir) {файл .dir};
+
+  \draw[->] (user) -- (tool);
+  \draw[->] (tool) -- (arc);
+  \draw[->] (tool) -- (dir);
+\end{tikzpicture}
+\caption{Общая архитектура утилиты \texttt{arcdir\_tool}}
+\end{table}
+\newpage
+
+\section{Последовательность выполнения программы}
+
+Процесс выполнения утилиты \texttt{arcdir\_tool} описывается как линейная последовательность действий:
+
+\needspace{15\baselineskip}
+\begin{enumerate}
+  \item Разбор аргументов командной строки и идентификация режима работы: \texttt{EXTRACT}, \texttt{PACK} или \texttt{PACK\_BIN}.
+  \item \textbf{Режим EXTRACT:}
+    \begin{itemize}
+      \item Открытие файлов ARC и DIR в режиме чтения;
+      \item Последовательное чтение записей из файла DIR;
+      \item Применение опциональных правил перенаправления путей;
+      \item Запись данных файлов в соответствующие выходные директории.
+    \end{itemize}
+  \item \textbf{Режимы PACK и PACK\_BIN:}
+    \begin{itemize}
+      \item Рекурсивное сканирование указанных директорий и файлов;
+      \item Применение фильтра расширений (\texttt{.bin} для режима PACK\_BIN);
+      \item Лексикографическая сортировка всех обнаруженных путей;
+      \item Запись индекса DIR и последовательное размещение данных файлов в ARC;
+      \item Применение дополнений для выравнивания строк пути (кратность 4 байтам) и данных файлов (кратность 32 байтам).
+    \end{itemize}
+  \item Закрытие всех файлов и корректное завершение работы.
+\end{enumerate}
+
+\section{Интерфейс командной строки}
+
+\subsection{Синтаксис}
+
+\begin{lstlisting}
+arcdir_tool EXTRACT <archive.arc> <index.dir> [<src> <dst>]...
+arcdir_tool PACK <archive.arc> <index.dir> [path...]
+arcdir_tool PACK_BIN <archive.arc> <index.dir> [path...]
+\end{lstlisting}
+
+\subsection{Режимы}
+
+\subsubsection{EXTRACT}
+
+\needspace{4\baselineskip}
+\begin{itemize}
+  \item Извлечение файлов из существующего архива \texttt{.arc}/\texttt{.dir}.
+  \item При отсутствии пар \texttt{<src> <dst>} извлекаются все файлы по исходным путям.
+  \item При указании пар извлекаются только соответствующие файлы и записываются в целевые директории.
+\end{itemize}
+
+\subsubsection{PACK}
+
+\needspace{5\baselineskip}
+\begin{itemize}
+  \item Создание новой пары архивных файлов \texttt{.arc}/\texttt{.dir}.
+  \item Аргументы могут быть как файлами, так и директориями;
+  \item Директории обрабатываются рекурсивно;
+  \item Все обнаруженные файлы включаются в алфавитном порядке.
+\end{itemize}
+
+\subsubsection{PACK\_BIN}
+
+\needspace{3\baselineskip}
+\begin{itemize}
+  \item Идентичен режиму PACK, но рекурсивно найденные файлы фильтруются по расширению \texttt{.bin};
+  \item Явно указанные файлы включаются независимо от расширения.
+\end{itemize}
+
+\subsection{Примеры использования}
+
+\begin{lstlisting}
+# Extract all files
+arcdir_tool EXTRACT data.arc data.dir
+
+# Extract a single file to a custom path
+arcdir_tool EXTRACT data.arc data.dir a/b.bin out.bin
+
+# Pack a directory recursively
+arcdir_tool PACK data.arc data.dir assets/
+
+# Pack only .bin files from directories
+arcdir_tool PACK_BIN data.arc data.dir assets/
+\end{lstlisting}
+
+
+\section{Обнаружение и сортировка файлов}
+
+Процедура упаковки файлов включает следующие этапы:
+\needspace{7\baselineskip}
+\begin{enumerate}
+  \item Анализ каждого аргумента командной строки;
+  \item Рекурсивное сканирование директорий;
+  \item Непосредственное добавление файлов;
+  \item Применение опционального фильтра по расширению;
+  \item Лексикографическая сортировка результирующего списка файлов.
+\end{enumerate}
+
+\section{Структура бинарного формата}
+
+Все числовые поля представлены в формате big-endian.
+
+\subsection{Файл DIR}
+
+\subsubsection{Заголовок}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+Смещение & Размер & Описание \\
+\hline
+0x00 & 4 байта & Общий размер файла DIR (u32, big-endian) \\
+0x04 & 4 байта & Количество записей (u32, big-endian) \\
+\hline
+\end{tabular}
+\caption{Структура заголовка файла DIR}
+\end{table}
+
+\subsubsection{Запись индекса}
+
+Каждая запись имеет структуру:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+Поле & Размер & Описание \\
+\hline
+Offset & 4 байта & Смещение начала данных файла в ARC (u32, big-endian) \\
+Size & 4 байта & Размер данных файла в байтах (u32, big-endian) \\
+PathLen & 4 байта & Длина строки пути с учётом выравнивания (u32, big-endian) \\
+Path & PathLen байт & Нуль-терминированная строка пути, выровненная до 4 байт \\
+\hline
+\end{tabular}
+\caption{Структура записи файла DIR}
+\end{table}
+
+\subsection{Файл ARC}
+
+\needspace{3\baselineskip}
+\begin{itemize}
+  \item Последовательная запись сырых данных файлов;
+  \item Добавление выравнивающего дополнения после каждого файла для обеспечения кратности 32 байтам;
+  \item Дополнение заполняется байтами \texttt{0xCC}.
+\end{itemize}
+
+\subsection{Правила выравнивания}
+
+\subsubsection{Выравнивание строк пути}
+
+\begin{lstlisting}[language=C]
+pad = (~(len - 1)) & (4 - 1);
+total_len = len + pad;
+\end{lstlisting}
+
+\subsubsection{Выравнивание данных файлов}
+
+\begin{lstlisting}[language=C]
+pad = (~(data_size - 1)) & (32 - 1);
+\end{lstlisting}
+\newpage
+
+\section{Алгоритм упаковки}
+
+\needspace{12\baselineskip}
+\begin{enumerate}
+  \item Открытие ARC и DIR в режиме записи;
+  \item Резервирование 8 байт в DIR для заголовка;
+  \item Для каждого отсортированного файла:
+    \begin{itemize}
+      \item Считывание содержимого файла в оперативную память;
+      \item Формирование записи DIR: смещение в ARC, размер файла, длина пути с выравниванием, строка пути с выравниванием;
+      \item Последовательная запись данных файла в ARC;
+      \item Применение выравнивающего дополнения до кратности 32 байтам с использованием 0xCC.
+    \end{itemize}
+  \item Запись общего размера файла DIR и количества записей в начале файла.
+\end{enumerate}
+
+\section{Алгоритм извлечения}
+
+\needspace{12\baselineskip}
+\begin{enumerate}
+  \item Открытие ARC и DIR в режиме чтения;
+  \item Чтение заголовка DIR (общий размер и количество записей);
+  \item Для каждой записи:
+    \begin{itemize}
+      \item Чтение смещения, размера и длины пути;
+      \item Чтение строки пути и удаление выравнивающего дополнения;
+      \item Применение опциональных правил перенаправления;
+      \item Переход к смещению в ARC;
+      \item Чтение данных файла и запись в целевую директорию.
+    \end{itemize}
+\end{enumerate}
+
+\section{Обработка путей}
+
+\needspace{3\baselineskip}
+\begin{itemize}
+  \item Пути представлены как байтовые строки, совместимые с кодировкой Shift-JIS;
+  \item Разделители директорий нормализуются к символу '/' при упаковке;
+  \item Таблицы перенаправления применяются опционально во время извлечения.
+\end{itemize}
+
+\section{Обработка ошибок}
+
+\needspace{3\baselineskip}
+\begin{itemize}
+  \item Чтение фиксированного количества байт; обнаружение EOF вызывает ошибку;
+  \item Размер заголовка DIR используется для проверки корректности;
+  \item Ошибки ввода/вывода приводят к немедленному завершению работы программы.
+\end{itemize}
+
+\section{Детерминированность}
+
+Для идентичных входных данных:
+\needspace{3\baselineskip}
+\begin{itemize}
+  \item Структура записей DIR и размещение данных в ARC воспроизводимы;
+  \item Лексикографическая сортировка обеспечивает детерминированность;
+  \item Фиксированные правила выравнивания сохраняют корректное смещение данных.
+\end{itemize}
+
+\section{Заключение}
+
+Формат ARC/DIR представляет собой индексированный контейнер данных:  
+\needspace{4\baselineskip}
+\begin{itemize}
+  \item \texttt{.arc} содержит последовательные блоки данных;
+  \item \texttt{.dir} содержит метаданные, сопоставляющие пути файлов со смещениями и размерами;
+  \item Используются целые числа в формате big-endian и строгие правила выравнивания;
+  \item Утилита \texttt{arcdir\_tool} обеспечивает полное управление упаковкой и извлечением архивов с детерминированным результатом.
+\end{itemize}
+
+\end{document}

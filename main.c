@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +7,10 @@
 #include "parse.h"
 
 #ifdef _WIN32
+#include <windows.h>
 #define strcasecmp _stricmp
+#else
+#include <strings.h>
 #endif
 
 static void help_extract(void) {
@@ -39,7 +43,6 @@ static void help_all(void) {
     help_pack();
 }
 
-
 int main(int argc, char **argv) {
     if (argc < 2) {
         help_all();
@@ -63,7 +66,7 @@ int main(int argc, char **argv) {
         PathRedirect *map = NULL;
 
         if (map_count > 0) {
-            map = (PathRedirect*)malloc(sizeof(PathRedirect) * map_count);
+            map = (PathRedirect*)malloc(sizeof(PathRedirect) * (size_t)map_count);
             for (int i = 0; i < map_count; i++) {
                 map[i].from = argv[4 + i * 2];
                 map[i].to   = argv[5 + i * 2];

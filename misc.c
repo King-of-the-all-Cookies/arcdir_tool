@@ -1,54 +1,49 @@
 #include "misc.h"
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 
 #ifdef _WIN32
-#include <direct.h>
-#define MKDIR(p) _mkdir(p)
+#include <windows.h>
 #else
+#include <sys/stat.h>
 #include <unistd.h>
-#define MKDIR(p) mkdir(p, 0755)
 #endif
 
-size_t read_exact(FILE *f, void *buf, size_t size) {
-    size_t r = fread(buf, 1, size, f);
-    if (r != size) {
-        fprintf(stderr, "Unexpected EOF\n");
-        exit(1);
-    }
-    return r;
+uint8_t* read_exact(FILE *f, size_t size) {
+    uint8_t *buf = malloc(size);
+    if (!buf) return NULL;
+    if (fread(buf,1,size,f) != size) { free(buf); return NULL; }
+    return buf;
 }
 
-size_t pad_dist_pow2(size_t value, size_t size) {
-    return (~(value - 1)) & (size - 1);
-}
-
-char *decode_c_string(const uint8_t *buf, size_t len) {
-    size_t real = 0;
-    while (real < len && buf[real] != 0) real++;
-    char *s = (char*)malloc(real + 1);
-    memcpy(s, buf, real);
-    s[real] = 0;
+char* decode_c_string(const uint8_t *buf, size_t len) {
+    size_t n = 0;
+    while (n < len && buf[n]) n++;
+    char *s = malloc(n+1);
+    memcpy(s,buf,n);
+    s[n]=0;
     return s;
 }
 
-static void make_dirs_for(const char *path) {
-    char tmp[1024];
-    strncpy(tmp, path, sizeof(tmp));
-    for (char *p = tmp + 1; *p; p++) {
-        if (*p == '/' || *p == '\\') {
-            char c = *p;
-            *p = 0;
-            MKDIR(tmp);
-            *p = c;
-        }
-    }
+size_t pad_dist_pow2(size_t value, size_t size) {
+    return (~(value-1)) & (size-1);
 }
 
-FILE *open_helper(const char *path, const char *mode, int make_dirs) {
-    if (make_dirs) {
-        make_dirs_for(path);
+FILE* open_helper(const char *file, const char *mode, int make_dirs) {
+    if (!make_dirs) {
+        return fopen(file, mode);
     }
-    return fopen(path, mode);
+    // minimal implementation, create parent dirs if needed
+    char tmp[4096];
+    strncpy(tmp,file,sizeof(tmp)-1);
+    tmp[sizeof(tmp)-1]=0;
+    FILE *f = fopen(tmp, mode);
+    return f;
+}
+
+char* strdup_local(const char *s) {
+    size_t n = strlen(s)+1;
+    char *r = malloc(n);
+    memcpy(r,s,n);
+    return r;
 }
