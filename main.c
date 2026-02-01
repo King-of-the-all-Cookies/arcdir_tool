@@ -11,28 +11,34 @@
 
 static void help_extract(void) {
     puts(
-        "Usage: arcdir_tool EXTRACT <*.arc path> <*.dir path> "
-        "[<file 1> <destination 1>] [<file 2> <destination 2>] ... [<file N> <destination N>]\n"
-        "You may provide optional file and destination argument pairs to extract individual files to an exact destination. "
-        "Otherwise, all files will be extracted to their relative filepaths."
+        "Usage:\n"
+        "  arcdir_tool EXTRACT <archive.arc> <index.dir> [<src> <dst>]...\n"
+        "\n"
+        "Example:\n"
+        "  arcdir_tool EXTRACT data.arc data.dir\n"
+        "  arcdir_tool EXTRACT data.arc data.dir a/b.bin out.bin\n"
     );
 }
 
 static void help_pack(void) {
     puts(
-        "Usage: arcdir_tool PACK <*.arc path> <*.dir path> [path 1] [path 2] ... [path N]\n"
-        "       arcdir_tool PACK_BIN <*.arc path> <*.dir path> [path 1] [path 2] ... [path N]\n"
-        "Each optional path argument will pack that file (or directory, recursively) into the archive. "
-        "The latter command will filter recursively found files by their extension."
+        "Usage:\n"
+        "  arcdir_tool PACK <archive.arc> <index.dir> [path...]\n"
+        "  arcdir_tool PACK_BIN <archive.arc> <index.dir> [path...]\n"
+        "\n"
+        "Example:\n"
+        "  arcdir_tool PACK data.arc data.dir assets/\n"
+        "  arcdir_tool PACK_BIN data.arc data.dir assets/\n"
     );
 }
 
 static void help_all(void) {
-    puts("All filepaths are relative to the current working directory, so it is recommended to run this program from the dataDir directory of Pikmin 1 when packing.\n");
+    puts("arcdir_tool - ARC/DIR packer and extractor\n");
     help_extract();
     puts("");
     help_pack();
 }
+
 
 int main(int argc, char **argv) {
     if (argc < 2) {
